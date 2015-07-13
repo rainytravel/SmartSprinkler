@@ -37,7 +37,7 @@ import com.smart.sprinkler.weather.WeatherAPI;
 public class MoistureSensor {
 	
 	public static final int TRIGGER_INTERVAL = 6;
-	public static final int MACHINE_LEARNING_CORRECTION = 100;
+	public static final int MACHINE_LEARNING_CORRECTION = 10;
 	static boolean  firstTime = true;
     
     public static void main(final String[] args) throws InterruptedException, IOException {

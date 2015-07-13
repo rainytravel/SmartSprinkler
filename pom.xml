@@ -21,7 +21,7 @@
         <applicationKey>b7bb002b-b335-4200-9dc9-92cb0e5e2df3</applicationKey>
 
         <!-- Replace raspberrypi with the hostname or ip address of your raspberry pi -->
-        <pi.deployment.url>scp://pi@172.16.0.213/home/pi</pi.deployment.url>
+        <pi.deployment.url>scp://pi@172.20.10.3/home/pi</pi.deployment.url>
 
         <!-- Change to no or empty to use real hardware -->
         <simulated>simulated</simulated>
