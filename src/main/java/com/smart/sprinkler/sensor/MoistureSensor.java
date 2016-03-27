@@ -42,20 +42,14 @@ public class MoistureSensor {
     
     public static void main(final String[] args) throws InterruptedException, IOException {
         
-        System.out.println("GPIO Moisture sensor Example ... started.");
+        System.out.println("Moisture sensor Example ... started.");
 
-        // create gpio controller
-        final GpioController gpio = GpioFactory.getInstance();
+        // call moisture sensor rest client
+        // keep program running until user aborts (CTRL-C)
+        for (;;) {
+        final Long sensorData=MoistureSensorRestClient.getMoistureData();
         
-        final GpioPinDigitalInput myButton = gpio.provisionDigitalInputPin(RaspiPin.GPIO_07, PinPullResistance.PULL_UP);
-        
-        myButton.addListener(new GpioPinListenerDigital() {
-
-			@Override
-			public void handleGpioPinDigitalStateChangeEvent(
-					GpioPinDigitalStateChangeEvent event) {
-				System.out.println("GPIO PIN STATE CHANGE: " + event.getPin() + "status is" + event.getState());
-				if(event.getState().isHigh()){
+				if(sensorData.longValue()==0){
 					System.out.println("LOW about to turn motor on");
 					try {
 						BaseDao dao = new BaseDao();
@@ -117,16 +111,12 @@ public class MoistureSensor {
 					} catch (InterruptedException e) {
 						System.out.println("Exception"+e.getMessage());
 					}
-				}if(event.getState().isLow()){
+				}if(sensorData.longValue()==1){
 					System.out.println("No Action");
 				}
-			}
-            
-        });
         
         
-        // keep program running until user aborts (CTRL-C)
-        for (;;) {
+       
             Thread.sleep(500);
         }
        
