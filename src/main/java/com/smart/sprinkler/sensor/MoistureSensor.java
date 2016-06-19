@@ -27,6 +27,12 @@ import com.pi4j.io.gpio.trigger.GpioSyncStateTrigger;
 import com.pi4j.io.i2c.I2CBus;
 import com.smart.sprinkler.data.BaseDao;
 import com.smart.sprinkler.motor.Motor;
+import com.smart.sprinkler.rs.clients.AutoPilotRestClient;
+import com.smart.sprinkler.rs.clients.LastWaterRunRestClient;
+import com.smart.sprinkler.rs.clients.MoistureSensorRestClient;
+import com.smart.sprinkler.rs.clients.SensorDataRestClient;
+import com.smart.sprinkler.rs.clients.SprinklerHealthRestClient;
+import com.smart.sprinkler.rs.clients.WeatherDataRestClient;
 import com.smart.sprinkler.weather.WeatherAPI;
 
 /**
@@ -43,81 +49,94 @@ public class MoistureSensor {
     public static void main(final String[] args) throws InterruptedException, IOException {
         
         System.out.println("Moisture sensor Example ... started.");
+        AutopilotThread autopilot = new AutopilotThread();
+        Thread thread = new Thread(autopilot); 
+        thread.start();
+        
+        String autoPilotFlag = AutoPilotRestClient.getConfig();
 
         // call moisture sensor rest client
         // keep program running until user aborts (CTRL-C)
         for (;;) {
-        final Long sensorData=MoistureSensorRestClient.getMoistureData();
-        
-				if(sensorData.longValue()==0){
-					System.out.println("LOW about to turn motor on");
-					try {
-						BaseDao dao = new BaseDao();
-						String cropType = args[0];
-						String location = args[1];
-						String strBl = dao.getDuration(cropType); // in mins
-						int correctedBL = 0;
-						
-						int baselineDuration = Integer.parseInt(strBl) ;
-						System.out.println("baselineDuration from DB: "+baselineDuration);
-						
-						/**
-						 * Machine learning
-						 */
-						Date tsFromDB = new Date(); //dao.getLastRun(cropType);
-						
-						if(tsFromDB != null){
-							/*Date date = new Date();
+        	final Long sensorData = MoistureSensorRestClient.getMoistureData();
+        	// heart-beat
+        	SprinklerHealthRestClient.postToServer();
+        	
+        	SensorDataRestClient.postToServer(sensorData, sensorData);
+
+        	if(sensorData.longValue()==1){
+        		System.out.println("HIGH about to turn motor on");
+        		try {
+        			BaseDao dao = new BaseDao();
+        			String cropType = args[0];
+        			String location = args[1];
+        			String strBl = dao.getDuration(cropType); // in mins
+        			int correctedBL = 0;
+
+        			int baselineDuration = Integer.parseInt(strBl) ;
+        			System.out.println("baselineDuration from DB: "+baselineDuration);
+
+        			/**
+        			 * Machine learning
+        			 */
+        			Date tsFromDB = new Date(); //dao.getLastRun(cropType);
+
+        			if(tsFromDB != null){
+        				/*Date date = new Date();
 							java.sql.Timestamp currentTime = new java.sql.Timestamp(date.getTime());
 							long diff = currentTime.getTime()-tsFromDB.getTime();
 							long diffHours = diff/((60*60*1000)%24);*/
-							//if(diffHours < TRIGGER_INTERVAL)
-							
-							if(!firstTime && true)
-							{
-								correctedBL = baselineDuration+((MACHINE_LEARNING_CORRECTION *baselineDuration)/100);
-								dao.updateBaseLine(correctedBL, cropType);
-							}else{
-								correctedBL = baselineDuration;
-								firstTime = false;
-							}
-						}/*else{
+        				//if(diffHours < TRIGGER_INTERVAL)
+
+        				if(!firstTime && true)
+        				{
+        					correctedBL = baselineDuration+((MACHINE_LEARNING_CORRECTION *baselineDuration)/100);
+        					dao.updateBaseLine(correctedBL, cropType);
+        				}else{
+        					correctedBL = baselineDuration;
+        					firstTime = false;
+        				}
+        			}/*else{
 							correctedBL = baselineDuration;
 						}*/
-						
-						
-						System.out.println("CorrectedBL from DB: "+correctedBL);
-						
-						
-						/**
-						 * Weather API and Logic for weather correction
-						 */
-						int chancesPercentage =  Integer.parseInt(WeatherAPI.getChanceOfRain(location));
-						System.out.println("chancesPercentage: "+chancesPercentage);
-						
-						int newBaselineDuration = correctedBL - ((correctedBL * chancesPercentage)/100);
-						
-						System.out.println("newBaselineDuration: "+newBaselineDuration);
-						
-						
-						/**
-						 * Logic of starting motor
-						 */
-						if(newBaselineDuration != 0){
-							Motor.turnOnMotor(newBaselineDuration);
-							dao.insertEvent(cropType);
-						}
-						
-					} catch (InterruptedException e) {
-						System.out.println("Exception"+e.getMessage());
-					}
-				}if(sensorData.longValue()==1){
-					System.out.println("No Action");
-				}
-        
-        
-       
-            Thread.sleep(500);
+
+
+        			System.out.println("CorrectedBL from DB: "+correctedBL);
+
+
+        			/**
+        			 * Weather API and Logic for weather correction
+        			 */
+        			int chancesPercentage =  Integer.parseInt(WeatherAPI.getChanceOfRain(location));
+        			System.out.println("chancesPercentage: "+chancesPercentage);
+        			WeatherDataRestClient.postToServer(chancesPercentage);
+
+        			int newBaselineDuration = correctedBL - ((correctedBL * chancesPercentage)/100);
+
+        			System.out.println("newBaselineDuration: "+newBaselineDuration);
+
+
+        			/**
+        			 * Logic of starting motor
+        			 */
+        			// autoPilotFlag = 1 then Sprinkler manage motor
+        			System.out.println("Autopilot is set to "+autoPilotFlag);
+        			if(autoPilotFlag != null && autoPilotFlag.equalsIgnoreCase("1")){
+        				if(newBaselineDuration != 0){
+        					Motor.turnOnMotor(newBaselineDuration);
+        					LastWaterRunRestClient.postToServer();
+        					dao.insertEvent(cropType);
+        				}
+        			}
+
+        		} catch (InterruptedException e) {
+        			System.out.println("Exception"+e.getMessage());
+        		}
+        	}if(sensorData.longValue()==1){
+        		System.out.println("No Action");
+        	}
+
+        	Thread.sleep(30000);
         }
        
     }

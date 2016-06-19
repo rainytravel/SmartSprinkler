@@ -150,6 +150,7 @@ public class WeatherAPI {
 		{
 			System.out.println("Exception in WeatherAPI"+exp.getMessage());
 			exp.printStackTrace();
+			return "0";
 		}
 		return chanceOfRain;
 	     
